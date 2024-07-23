@@ -1,0 +1,13 @@
+[package]
+name = "wave"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+iced = { git = "https://github.com/iced-rs/iced.git", features = [
+    "canvas",
+    "debug",
+] }
+cpal = { version = "*", features = ["jack"] }
+ringbuf = "0.4.1"
+lazy_static = "1.5.0"
