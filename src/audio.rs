@@ -1,10 +1,7 @@
-use std::sync::Arc;
-
 use cpal::traits::{DeviceTrait, HostTrait};
 use cpal::{Device, Host, InputCallbackInfo, OutputCallbackInfo, Stream, StreamConfig};
 use crossbeam_channel::{bounded, Receiver, Sender};
 use lazy_static::lazy_static;
-use ringbuf::storage::Heap;
 
 use crate::effects::filter::Filter;
 
