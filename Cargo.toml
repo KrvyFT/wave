@@ -11,3 +11,4 @@ iced = { git = "https://github.com/iced-rs/iced.git", features = [
 cpal = { version = "*", features = ["jack"] }
 ringbuf = "0.4.1"
 lazy_static = "1.5.0"
+crossbeam-channel = "*"
