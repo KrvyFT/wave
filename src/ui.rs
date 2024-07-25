@@ -1,9 +1,8 @@
 use cpal::traits::StreamTrait;
-use cpal::{InputCallbackInfo, OutputCallbackInfo};
 use iced::widget::{button, column, container, slider, text};
 use iced::{Center, Element, Fill};
 
-use crate::audio::{Wave, AUDIO_CHANNELS, EFF_CHANNELS};
+use crate::audio::{Wave, EFF_CHANNELS};
 use crate::effects::filter::Filter;
 
 #[derive(Debug, Clone, Copy)]
@@ -40,41 +39,8 @@ impl Wave {
                 self.filter.used = true;
                 self.clear_stream();
 
-                let (input_stream, output_stream) = self.change_stream(
-                    move |data: &[f32], _info: &InputCallbackInfo| {
-                        for &sample in data {
-                            AUDIO_CHANNELS.0.send(sample).unwrap();
-                        }
-                    },
-                    move |data: &mut [f32], _info: &OutputCallbackInfo| {
-                        static mut FILTER: Filter = Filter {
-                            used: true,
-                            alpha: 0.0,
-                        };
-
-                        let mut alpha = unsafe { FILTER.alpha };
-                        if let Ok(v) = EFF_CHANNELS.1.try_recv() {
-                            println!("{}", v);
-                            unsafe {
-                                FILTER.alpha = v;
-                            }
-                            alpha = v;
-                        } else {
-                        };
-
-                        for sample in data {
-                            *sample = Filter::low_pass_filter(
-                                alpha,
-                                AUDIO_CHANNELS.1.recv().unwrap_or(0.0),
-                            )
-                        }
-                    },
-                );
-
-                input_stream.play().unwrap();
-                output_stream.play().unwrap();
-                self.input_stream = Some(input_stream);
-                self.output_stream = Some(output_stream);
+                self.change_stream(Self::default_handle_input(), Filter::filter_handle_output())
+                    .unwrap();
             }
             Message::FilterSliderChanged(alpha) => {
                 self.filter.alpha = alpha as f32;

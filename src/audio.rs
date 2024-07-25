@@ -1,17 +1,18 @@
-use cpal::traits::{DeviceTrait, HostTrait};
+use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{Device, Host, InputCallbackInfo, OutputCallbackInfo, Stream, StreamConfig};
-use crossbeam_channel::{bounded, Receiver, Sender};
+use crossbeam_channel::{bounded, unbounded, Receiver, Sender};
 use lazy_static::lazy_static;
 
 use crate::effects::filter::Filter;
+use crate::Error;
 
 lazy_static! {
     pub static ref EFF_CHANNELS: (Sender<f32>, Receiver<f32>) = {
-        let (tx, rx) = bounded(1);
+        let (tx, rx) = unbounded();
         (tx, rx)
     };
     pub static ref AUDIO_CHANNELS: (Sender<f32>, Receiver<f32>) = {
-        let (tx, rx) = bounded(1);
+        let (tx, rx) = bounded(5);
         (tx, rx)
     };
 }
@@ -60,19 +61,25 @@ impl Wave {
     }
 
     pub fn change_stream(
-        &self,
+        &mut self,
         handle_input: impl FnMut(&[f32], &InputCallbackInfo) + Send + 'static,
         handle_output: impl FnMut(&mut [f32], &OutputCallbackInfo) + Send + 'static,
-    ) -> (Stream, Stream) {
-        let input_stream = self
-            .input_device
-            .build_input_stream(&self.config, handle_input, Self::err_fn, None)
-            .unwrap();
-        let output_stream = self
-            .output_device
-            .build_output_stream(&self.config, handle_output, Self::err_fn, None)
-            .unwrap();
-        (input_stream, output_stream)
+    ) -> Result<(), Error> {
+        let input_stream =
+            self.input_device
+                .build_input_stream(&self.config, handle_input, Self::err_fn, None)?;
+        let output_stream = self.output_device.build_output_stream(
+            &self.config,
+            handle_output,
+            Self::err_fn,
+            None,
+        )?;
+        input_stream.play()?;
+        output_stream.play()?;
+        self.input_stream = Some(input_stream);
+        self.output_stream = Some(output_stream);
+
+        Ok(())
     }
 
     pub fn device_config(host: &cpal::Host) -> (cpal::StreamConfig, Device, Device) {
@@ -98,5 +105,13 @@ impl Wave {
     pub fn clear_stream(&mut self) {
         drop(self.input_stream.take());
         drop(self.output_stream.take());
+    }
+
+    pub fn default_handle_input() -> impl FnMut(&[f32], &InputCallbackInfo) + Send + 'static {
+        move |data: &[f32], _info: &InputCallbackInfo| {
+            for &sample in data {
+                AUDIO_CHANNELS.0.send(sample).unwrap();
+            }
+        }
     }
 }
